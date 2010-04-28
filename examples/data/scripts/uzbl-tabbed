@@ -1211,37 +1211,90 @@ class UzblTabbed:
         else:
             tab_format = "<span %(tabc)s> [ <span %(textc)s>%(index)d</span> ] </span>"
 
+        tab_strings = []
+        tab_widths  = [] # in pixels
+
         for index, tab in enumerate(self.notebook):
             if tab not in tabs: continue
+
             uzbl = self.tabs[tab]
             title = escape(uzbl.tabtitle)
 
             style = colour_selector(index, curpage, uzbl)
             (tabc, textc) = style
 
-            if multiline_tabs:
-                opango = pango
+            text = tab_format % locals()
+            self.tablist.set_markup(text)
+            tab_strings.append(text)
+            tab_widths.append(self.tablist.get_layout().get_pixel_size()[0])
 
-                pango += tab_format % locals()
 
-                self.tablist.set_markup(pango)
-                listwidth = self.tablist.get_layout().get_pixel_size()[0]
-                winwidth = self.window.get_size()[0]
+        widthRemaining = self.window.get_size()[0] - 40 # leave room for a < and > and some margins
+        leftIndex = curpage
+        rightIndex = curpage+1
+        numPages = self.notebook.get_n_pages()
 
-                if listwidth > (winwidth - 20):
-                    multiline.append(opango)
-                    pango = tab_format % locals()
-            else:
-                pango += tab_format % locals()
+        visibleTabs = []
 
-        if multiline_tabs:
-            multiline.append(pango)
-            self.tablist.set_markup('&#10;'.join(multiline))
+        while (leftIndex >= 0 or rightIndex < numPages) and widthRemaining > 0:
+            changed = 0
+            if leftIndex >= 0 and widthRemaining >= tab_widths[leftIndex]:
+                visibleTabs.insert(0, tab_strings[leftIndex])
+                widthRemaining -= tab_widths[leftIndex]
+                leftIndex -= 1
+                changed = 1
 
-        else:
-            self.tablist.set_markup(pango)
+            if rightIndex < numPages and widthRemaining >= tab_widths[rightIndex]:
+                visibleTabs.append(tab_strings[rightIndex])
+                widthRemaining -= tab_widths[rightIndex]
+                rightIndex += 1
+                changed = 1
+
+            if changed == 0:
+                widthRemaining = 0 # short-circuit when we run out of tabs that will fit
+
+        pango = ""
+        if leftIndex >= 0: # it would be < 0 if we're showing the leftmost tab
+            pango += "<span %s>&lt; </span>" % (config['tab_colours'],)
+        pango += ''.join(visibleTabs)
+        if rightIndex < numPages: # likewise, it would be == numPages if we're showing the rightmost tab
+            pango += "<span %s> &gt;</span>" % (config['tab_colours'],)
+        self.tablist.set_markup(pango)
 
         return True
+
+
+        #for index, tab in enumerate(self.notebook):
+        #    if tab not in tabs: continue
+        #    uzbl = self.tabs[tab]
+        #    title = escape(uzbl.tabtitle)
+
+        #    style = colour_selector(index, curpage, uzbl)
+        #    (tabc, textc) = style
+
+        #    if multiline_tabs:
+        #        opango = pango
+
+        #        pango += tab_format % locals()
+
+        #        self.tablist.set_markup(pango)
+        #        listwidth = self.tablist.get_layout().get_pixel_size()[0]
+        #        winwidth = self.window.get_size()[0]
+
+        #        if listwidth > (winwidth - 20):
+        #            multiline.append(opango)
+        #            pango = tab_format % locals()
+        #    else:
+        #        pango += tab_format % locals()
+
+        #if multiline_tabs:
+        #    multiline.append(pango)
+        #    self.tablist.set_markup('&#10;'.join(multiline))
+
+        #else:
+        #    self.tablist.set_markup(pango)
+
+        #return True
 
 
     def save_session(self, session_file=None):
